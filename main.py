@@ -387,40 +387,43 @@ def main():
     # 5. Rank 0 salva resultados
     # -----------------------------------------------------------------------
     if rank == 0:
+        import json
         log("=" * 60)
         log("Salvando resultados...")
 
-        # CSV
-        save_csv(results_esta_execucao, OUTPUT_DIR)
+        historico_path = os.path.join(OUTPUT_DIR, "historico.json")
+        all_results = {}
+        
+        # Carrega execuções anteriores, se existirem
+        if os.path.exists(historico_path):
+            with open(historico_path, "r") as f:
+                all_results = json.load(f)
 
-        # Gráficos
-        plot_time_vs_procs(results_esta_execucao, OUTPUT_DIR)
-        plot_speedup(results_esta_execucao, OUTPUT_DIR)
+        # Mescla os resultados da execução atual
+        for filtro, proc_data in results_esta_execucao.items():
+            if filtro not in all_results:
+                all_results[filtro] = {}
+            for n_proc, stats in proc_data.items():
+                all_results[filtro][str(n_proc)] = stats
 
-        # Relatório
-        gerar_relatorio(results_esta_execucao, img_shape, img_src, OUTPUT_DIR)
+        # Salva o novo histórico
+        with open(historico_path, "w") as f:
+            json.dump(all_results, f)
+
+        # Converte as chaves de string (do JSON) de volta para int para os gráficos
+        resultados_finais = {}
+        for filtro, proc_data in all_results.items():
+            resultados_finais[filtro] = {int(k): v for k, v in proc_data.items()}
+
+        # Gera os arquivos finais acumulados
+        save_csv(resultados_finais, OUTPUT_DIR)
+        plot_time_vs_procs(resultados_finais, OUTPUT_DIR)
+        plot_speedup(resultados_finais, OUTPUT_DIR)
+        gerar_relatorio(resultados_finais, img_shape, img_src, OUTPUT_DIR)
 
         log("=" * 60)
         log("CONCLUÍDO. Verifique a pasta 'output/' para os resultados.")
         log("=" * 60)
-
-        # Resumo no terminal
-        print("\n" + "=" * 60)
-        print(f"  RESUMO – {size} processo(s)")
-        print("=" * 60)
-        for filtro, proc_data in results_esta_execucao.items():
-            nome = "Média" if filtro == "mean" else "Mediana"
-            print(f"\n  Filtro {nome}:")
-            seq_m = proc_data.get(1, {}).get("mean", None)
-            for n_proc in sorted(proc_data.keys()):
-                s = proc_data[n_proc]
-                sp = 1.0 if n_proc == 1 else (
-                    compute_speedup(seq_m, s["mean"]) if seq_m else 0.0
-                )
-                label = "Sequencial" if n_proc == 1 else f"{n_proc} processos"
-                print(f"    {label:<15}: {s['mean']:.4f}s ± {s['std']:.4f}s  "
-                      f"speedup={sp:.3f}x")
-        print()
 
 
 if __name__ == "__main__":
