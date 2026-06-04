@@ -1,0 +1,12 @@
+# Ambientes virtuais Python
+venv/
+.env
+
+# Arquivos compilados pelo Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Histórico / Saída dos Benchmarks (opcional, pode ser bom ignorar dependendo de como você entrega, mas aqui estou ignorando só a imagem sintética gerada para não poluir o repositório)
+output/entrada_sintetica.png
