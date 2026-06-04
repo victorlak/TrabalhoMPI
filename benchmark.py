@@ -1,16 +1,3 @@
-"""
-benchmark.py
-============
-Funções utilitárias para o benchmark dos filtros de suavização.
-
-Responsabilidades:
-    - Remoção de outliers pelo método IQR (Interquartile Range).
-    - Cálculo de estatísticas: média, variância, desvio padrão.
-    - Cálculo de speedup relativo ao tempo sequencial.
-    - Salvamento de resultados em CSV e geração de gráficos.
-    - Escrita do relatório textual automático.
-"""
-
 import os
 import csv
 import numpy as np
@@ -20,263 +7,173 @@ import matplotlib.pyplot as plt
 from typing import List, Dict, Tuple
 
 
-# ---------------------------------------------------------------------------
-# Remoção de outliers por IQR
-# ---------------------------------------------------------------------------
-
-def remove_outliers_iqr(times: List[float]) -> List[float]:
-    """
-    Remove outliers de uma lista de tempos usando a regra do IQR.
-
-    Regra:
-        Q1, Q3 = percentis 25 e 75
-        IQR = Q3 - Q1
-        Mantém valores no intervalo [Q1 - 1.5*IQR, Q3 + 1.5*IQR]
-
-    Parâmetros
-    ----------
-    times : list[float]
-        Lista de tempos de execução em segundos.
-
-    Retorna
-    -------
-    list[float]
-        Lista filtrada sem outliers.
-    """
-    arr = np.array(times, dtype=float)
-    q1 = np.percentile(arr, 25)
-    q3 = np.percentile(arr, 75)
-    iqr = q3 - q1
-    lower = q1 - 1.5 * iqr
-    upper = q3 + 1.5 * iqr
-    filtered = arr[(arr >= lower) & (arr <= upper)]
-    return filtered.tolist()
+def remover_outliers_iqr(tempos: List[float]) -> List[float]:
+    #remove outliers de uma lista de tempos usando a regra do IQR
+    vetor_tempos = np.array(tempos, dtype=float)
+    q1 = np.percentile(vetor_tempos, 25)
+    q3 = np.percentile(vetor_tempos, 75)
+    aiq = q3 - q1
+    limite_inferior = q1 - 1.5 * aiq
+    limite_superior = q3 + 1.5 * aiq
+    filtrados = vetor_tempos[(vetor_tempos >= limite_inferior) & (vetor_tempos <= limite_superior)]
+    return filtrados.tolist()
 
 
-# ---------------------------------------------------------------------------
-# Cálculo de estatísticas
-# ---------------------------------------------------------------------------
-
-def compute_stats(times: List[float]) -> Dict[str, float]:
-    """
-    Calcula média, variância e desvio padrão de uma lista de tempos.
-
-    Parâmetros
-    ----------
-    times : list[float]
-
-    Retorna
-    -------
-    dict com chaves: 'mean', 'variance', 'std', 'n' (n após remoção de outliers)
-    """
-    clean = remove_outliers_iqr(times)
-    arr = np.array(clean, dtype=float)
+def calcular_estatisticas(tempos: List[float]) -> Dict[str, float]:
+    #calcula média, variância e desvio padrão de uma lista de tempos
+    limpos = remover_outliers_iqr(tempos)
+    vetor_limpo = np.array(limpos, dtype=float)
     return {
-        "mean":     float(np.mean(arr)),
-        "variance": float(np.var(arr)),
-        "std":      float(np.std(arr)),
-        "n":        len(clean),
-        "raw_n":    len(times),
+        "media":         float(np.mean(vetor_limpo)),
+        "variancia":     float(np.var(vetor_limpo)),
+        "desvio_padrao": float(np.std(vetor_limpo)),
+        "n":             len(limpos),
+        "n_bruto":       len(tempos),
     }
 
 
-def compute_speedup(seq_mean: float, par_mean: float) -> float:
-    """
-    Calcula o speedup: S = T_seq / T_par.
-
-    Retorna 0.0 se par_mean for zero (evita divisão por zero).
-    """
-    if par_mean <= 0:
+def calcular_speedup(media_seq: float, media_par: float) -> float:
+    if media_par <= 0:
         return 0.0
-    return seq_mean / par_mean
+    return media_seq / media_par
 
 
-# ---------------------------------------------------------------------------
-# Salvamento de resultados em CSV
-# ---------------------------------------------------------------------------
+def salvar_csv(resultados: Dict, diretorio_saida: str = "output") -> str:
+    #salva a tabela de resultados em csv
+    os.makedirs(diretorio_saida, exist_ok=True)
+    caminho_arquivo = os.path.join(diretorio_saida, "resultados_benchmark.csv")
 
-def save_csv(results: Dict, output_dir: str = "output") -> str:
-    """
-    Salva a tabela de resultados de benchmark em um arquivo CSV.
-
-    Parâmetros
-    ----------
-    results : dict
-        Estrutura: { filtro: { n_proc: stats_dict } }
-        Exemplo: { 'mean': { 1: {'mean':0.5,...}, 2: {...} }, 'median': {...} }
-    output_dir : str
-
-    Retorna
-    -------
-    str : caminho do arquivo CSV criado.
-    """
-    os.makedirs(output_dir, exist_ok=True)
-    path = os.path.join(output_dir, "benchmark_results.csv")
-
-    with open(path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow([
+    with open(caminho_arquivo, "w", newline="", encoding="utf-8") as f:
+        escritor = csv.writer(f)
+        escritor.writerow([
             "Filtro", "Nº Processos", "Tempo Médio (s)",
             "Variância (s²)", "Desvio Padrão (s)", "Speedup", "N amostras"
         ])
-        for filtro, proc_data in results.items():
-            seq_mean = proc_data.get(1, {}).get("mean", None)
-            for n_proc in sorted(proc_data.keys()):
-                stats = proc_data[n_proc]
+        for filtro, dados_proc in resultados.items():
+            media_seq = dados_proc.get(1, {}).get("media", None)
+            for n_proc in sorted(dados_proc.keys()):
+                estatisticas = dados_proc[n_proc]
                 speedup = 1.0 if n_proc == 1 else (
-                    compute_speedup(seq_mean, stats["mean"]) if seq_mean else 0.0
+                    calcular_speedup(media_seq, estatisticas["media"]) if media_seq else 0.0
                 )
-                writer.writerow([
+                escritor.writerow([
                     filtro, n_proc,
-                    f"{stats['mean']:.6f}",
-                    f"{stats['variance']:.8f}",
-                    f"{stats['std']:.6f}",
+                    f"{estatisticas['media']:.6f}",
+                    f"{estatisticas['variancia']:.8f}",
+                    f"{estatisticas['desvio_padrao']:.6f}",
                     f"{speedup:.4f}",
-                    stats["n"],
+                    estatisticas["n"],
                 ])
 
-    print(f"[benchmark] CSV salvo em: {path}")
-    return path
+    print(f"[benchmark] CSV salvo em: {caminho_arquivo}")
+    return caminho_arquivo
 
 
-# ---------------------------------------------------------------------------
-# Geração de gráficos
-# ---------------------------------------------------------------------------
+def gerar_grafico_tempo_vs_processos(resultados: Dict, diretorio_saida: str = "output") -> str:
+    #gera o gráfico de tempo médio por número de processos para cada filtro
+    os.makedirs(diretorio_saida, exist_ok=True)
+    caminho_arquivo = os.path.join(diretorio_saida, "tempo_vs_processos.png")
 
-def plot_time_vs_procs(results: Dict, output_dir: str = "output") -> str:
-    """
-    Gera gráfico de tempo médio por número de processos para cada filtro.
+    figura, eixos = plt.subplots(figsize=(8, 5))
 
-    Parâmetros
-    ----------
-    results : dict (mesma estrutura de save_csv)
-    output_dir : str
+    cores      = {"media": "#2196F3", "mediana": "#FF5722"}
+    marcadores = {"media": "o",       "mediana": "s"}
+    rotulos    = {"media": "Filtro de Média",  "mediana": "Filtro de Mediana"}
 
-    Retorna
-    -------
-    str : caminho da imagem do gráfico.
-    """
-    os.makedirs(output_dir, exist_ok=True)
-    path = os.path.join(output_dir, "tempo_vs_processos.png")
-
-    fig, ax = plt.subplots(figsize=(8, 5))
-
-    colors   = {"mean": "#2196F3", "median": "#FF5722"}
-    markers  = {"mean": "o",       "median": "s"}
-    labels   = {"mean": "Filtro de Média",  "median": "Filtro de Mediana"}
-
-    for filtro, proc_data in results.items():
-        procs = sorted(proc_data.keys())
-        times = [proc_data[p]["mean"] for p in procs]
-        stds  = [proc_data[p]["std"]  for p in procs]
-        ax.errorbar(
-            procs, times,
-            yerr=stds,
-            label=labels.get(filtro, filtro),
-            color=colors.get(filtro, "gray"),
-            marker=markers.get(filtro, "o"),
+    for filtro, dados_proc in resultados.items():
+        processos = sorted(dados_proc.keys())
+        tempos    = [dados_proc[p]["media"] for p in processos]
+        desvios   = [dados_proc[p]["desvio_padrao"] for p in processos]
+        
+        eixos.errorbar(
+            processos, tempos,
+            yerr=desvios,
+            label=rotulos.get(filtro, filtro),
+            color=cores.get(filtro, "gray"),
+            marker=marcadores.get(filtro, "o"),
             linewidth=2,
             markersize=8,
             capsize=5,
         )
 
-    ax.set_xlabel("Número de Processos MPI", fontsize=12)
-    ax.set_ylabel("Tempo Médio (s)", fontsize=12)
-    ax.set_title("Tempo de Execução vs. Número de Processos", fontsize=14, fontweight="bold")
-    ax.legend(fontsize=11)
-    ax.grid(True, linestyle="--", alpha=0.5)
-    ax.set_xticks(sorted(set(p for fd in results.values() for p in fd.keys())))
+    eixos.set_xlabel("Número de Processos MPI", fontsize=12)
+    eixos.set_ylabel("Tempo Médio (s)", fontsize=12)
+    eixos.set_title("Tempo de Execução vs. Número de Processos", fontsize=14, fontweight="bold")
+    eixos.legend(fontsize=11)
+    eixos.grid(True, linestyle="--", alpha=0.5)
+    eixos.set_xticks(sorted(set(p for fd in resultados.values() for p in fd.keys())))
 
-    fig.tight_layout()
-    fig.savefig(path, dpi=150)
-    plt.close(fig)
-    print(f"[benchmark] Gráfico salvo em: {path}")
-    return path
+    figura.tight_layout()
+    figura.savefig(caminho_arquivo, dpi=150)
+    plt.close(figura)
+    print(f"[benchmark] Gráfico salvo em: {caminho_arquivo}")
+    return caminho_arquivo
 
 
-def plot_speedup(results: Dict, output_dir: str = "output") -> str:
-    """
-    Gera gráfico de speedup por número de processos para cada filtro.
-    Inclui a linha de speedup ideal (linear).
-    """
-    os.makedirs(output_dir, exist_ok=True)
-    path = os.path.join(output_dir, "speedup_vs_processos.png")
+def gerar_grafico_speedup(resultados: Dict, diretorio_saida: str = "output") -> str:
+    #Gera gráfico de speedup por número de processos para cada filtro
+    os.makedirs(diretorio_saida, exist_ok=True)
+    caminho_arquivo = os.path.join(diretorio_saida, "speedup_vs_processos.png")
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    figura, eixos = plt.subplots(figsize=(8, 5))
 
-    colors  = {"mean": "#2196F3", "median": "#FF5722"}
-    markers = {"mean": "o",       "median": "s"}
-    labels  = {"mean": "Filtro de Média",  "median": "Filtro de Mediana"}
+    cores      = {"media": "#2196F3", "mediana": "#FF5722"}
+    marcadores = {"media": "o",       "mediana": "s"}
+    rotulos    = {"media": "Filtro de Média",  "mediana": "Filtro de Mediana"}
 
-    all_procs = set()
-    for filtro, proc_data in results.items():
-        seq_mean = proc_data.get(1, {}).get("mean", None)
-        if seq_mean is None:
+    todos_processos = set()
+    for filtro, dados_proc in resultados.items():
+        media_seq = dados_proc.get(1, {}).get("media", None)
+        if media_seq is None:
             continue
-        procs   = sorted(proc_data.keys())
-        speedups = []
-        for p in procs:
-            s = compute_speedup(seq_mean, proc_data[p]["mean"]) if p != 1 else 1.0
-            speedups.append(s)
-        all_procs.update(procs)
-        ax.plot(
-            procs, speedups,
-            label=labels.get(filtro, filtro),
-            color=colors.get(filtro, "gray"),
-            marker=markers.get(filtro, "o"),
+        processos = sorted(dados_proc.keys())
+        lista_speedups = []
+        for p in processos:
+            s = calcular_speedup(media_seq, dados_proc[p]["media"]) if p != 1 else 1.0
+            lista_speedups.append(s)
+        todos_processos.update(processos)
+        eixos.plot(
+            processos, lista_speedups,
+            label=rotulos.get(filtro, filtro),
+            color=cores.get(filtro, "gray"),
+            marker=marcadores.get(filtro, "o"),
             linewidth=2,
             markersize=8,
         )
 
     # Linha de speedup ideal
-    max_p = max(all_procs) if all_procs else 8
-    ideal_procs = list(range(1, max_p + 1))
-    ax.plot(
-        ideal_procs, ideal_procs,
+    max_proc = max(todos_processos) if todos_processos else 8
+    processos_ideais = list(range(1, max_proc + 1))
+    eixos.plot(
+        processos_ideais, processos_ideais,
         label="Speedup Ideal",
         color="gray",
         linestyle="--",
         linewidth=1.5,
     )
 
-    ax.set_xlabel("Número de Processos MPI", fontsize=12)
-    ax.set_ylabel("Speedup", fontsize=12)
-    ax.set_title("Speedup vs. Número de Processos", fontsize=14, fontweight="bold")
-    ax.legend(fontsize=11)
-    ax.grid(True, linestyle="--", alpha=0.5)
-    ax.set_xticks(sorted(all_procs))
+    eixos.set_xlabel("Número de Processos MPI", fontsize=12)
+    eixos.set_ylabel("Speedup", fontsize=12)
+    eixos.set_title("Speedup vs. Número de Processos", fontsize=14, fontweight="bold")
+    eixos.legend(fontsize=11)
+    eixos.grid(True, linestyle="--", alpha=0.5)
+    eixos.set_xticks(sorted(todos_processos))
 
-    fig.tight_layout()
-    fig.savefig(path, dpi=150)
-    plt.close(fig)
-    print(f"[benchmark] Gráfico de speedup salvo em: {path}")
-    return path
+    figura.tight_layout()
+    figura.savefig(caminho_arquivo, dpi=150)
+    plt.close(figura)
+    print(f"[benchmark] Gráfico de speedup salvo em: {caminho_arquivo}")
+    return caminho_arquivo
 
 
-# ---------------------------------------------------------------------------
-# Geração do relatório textual
-# ---------------------------------------------------------------------------
 
-def gerar_relatorio(results: Dict, img_shape: Tuple[int, int],
-                    img_source: str, output_dir: str = "output") -> str:
-    """
-    Gera o arquivo relatorio.txt com os resultados e respostas reflexivas.
+def gerar_relatorio(resultados: Dict, dimensoes_imagem: Tuple[int, int],
+                    origem_imagem: str, diretorio_saida: str = "output") -> str:
 
-    Parâmetros
-    ----------
-    results : dict
-    img_shape : (altura, largura) da imagem usada.
-    img_source : 'entrada.jpg (lida do disco)' ou 'imagem sintética gerada'
-    output_dir : str
+    os.makedirs(diretorio_saida, exist_ok=True)
+    caminho_arquivo = os.path.join(diretorio_saida, "relatorio.txt")
 
-    Retorna
-    -------
-    str : caminho do relatório gerado.
-    """
-    os.makedirs(output_dir, exist_ok=True)
-    path = os.path.join(output_dir, "relatorio.txt")
-
-    H, W = img_shape
+    altura, largura = dimensoes_imagem
 
     # Monta a tabela de resultados
     linhas_tabela = []
@@ -285,54 +182,55 @@ def gerar_relatorio(results: Dict, img_shape: Tuple[int, int],
         f"{'Variância (s²)':>16} {'Desvio Padrão (s)':>18} {'Speedup':>10}"
     )
     linhas_tabela.append("-" * 90)
-    for filtro, proc_data in results.items():
-        seq_mean = proc_data.get(1, {}).get("mean", None)
-        nome = "Média" if filtro == "mean" else "Mediana"
-        for n_proc in sorted(proc_data.keys()):
-            stats = proc_data[n_proc]
+    
+    for filtro, dados_proc in resultados.items():
+        media_seq = dados_proc.get(1, {}).get("media", None)
+        nome = "Média" if filtro == "media" else "Mediana"
+        for n_proc in sorted(dados_proc.keys()):
+            estatisticas = dados_proc[n_proc]
             speedup = 1.0 if n_proc == 1 else (
-                compute_speedup(seq_mean, stats["mean"]) if seq_mean else 0.0
+                calcular_speedup(media_seq, estatisticas["media"]) if media_seq else 0.0
             )
-            label = "Sequencial" if n_proc == 1 else f"{n_proc} processos"
+            rotulo = "Sequencial" if n_proc == 1 else f"{n_proc} processos"
             linhas_tabela.append(
-                f"{nome:<10} {label:>10} {stats['mean']:>18.6f} "
-                f"{stats['variance']:>16.8f} {stats['std']:>18.6f} {speedup:>10.4f}"
+                f"{nome:<10} {rotulo:>10} {estatisticas['media']:>18.6f} "
+                f"{estatisticas['variancia']:>16.8f} {estatisticas['desvio_padrao']:>18.6f} {speedup:>10.4f}"
             )
         linhas_tabela.append("")
 
     tabela_str = "\n".join(linhas_tabela)
 
     # Respostas reflexivas dinâmicas baseadas nos dados reais
-    media_speedups   = {}
-    mediana_speedups = {}
+    speedups_media   = {}
+    speedups_mediana = {}
     for n_proc in [2, 4, 8]:
-        if "mean" in results and n_proc in results["mean"] and 1 in results["mean"]:
-            media_speedups[n_proc] = compute_speedup(
-                results["mean"][1]["mean"], results["mean"][n_proc]["mean"]
+        if "media" in resultados and n_proc in resultados["media"] and 1 in resultados["media"]:
+            speedups_media[n_proc] = calcular_speedup(
+                resultados["media"][1]["media"], resultados["media"][n_proc]["media"]
             )
-        if "median" in results and n_proc in results["median"] and 1 in results["median"]:
-            mediana_speedups[n_proc] = compute_speedup(
-                results["median"][1]["mean"], results["median"][n_proc]["mean"]
+        if "mediana" in resultados and n_proc in resultados["mediana"] and 1 in resultados["mediana"]:
+            speedups_mediana[n_proc] = calcular_speedup(
+                resultados["mediana"][1]["media"], resultados["mediana"][n_proc]["media"]
             )
 
     # Comparação de speedup médio entre os filtros
-    comp_speedup_txt = ""
-    if media_speedups and mediana_speedups:
-        avg_media   = np.mean(list(media_speedups.values()))
-        avg_mediana = np.mean(list(mediana_speedups.values()))
-        if avg_mediana > avg_media:
-            comp_speedup_txt = (
-                f"O filtro de mediana obteve speedup médio ({avg_mediana:.3f}) MAIOR "
-                f"que o de média ({avg_media:.3f}). Isso pode parecer contraintuitivo, "
+    texto_comparacao_speedup = ""
+    if speedups_media and speedups_mediana:
+        media_dos_speedups_media   = np.mean(list(speedups_media.values()))
+        media_dos_speedups_mediana = np.mean(list(speedups_mediana.values()))
+        if media_dos_speedups_mediana > media_dos_speedups_media:
+            texto_comparacao_speedup = (
+                f"O filtro de mediana obteve speedup médio ({media_dos_speedups_mediana:.3f}) MAIOR "
+                f"que o de média ({media_dos_speedups_media:.3f}). Isso pode parecer contraintuitivo, "
                 f"pois a mediana envolve ordenação e é computacionalmente mais pesada, "
                 f"mas significa que o ganho relativo com paralelização foi maior – "
                 f"possivelmente porque o overhead do trabalho extra se beneficia mais "
                 f"da distribuição entre processos."
             )
         else:
-            comp_speedup_txt = (
-                f"O filtro de média obteve speedup médio ({avg_media:.3f}) MAIOR "
-                f"que o de mediana ({avg_mediana:.3f}). Isso é esperado: o filtro "
+            texto_comparacao_speedup = (
+                f"O filtro de média obteve speedup médio ({media_dos_speedups_media:.3f}) MAIOR "
+                f"que o de mediana ({media_dos_speedups_mediana:.3f}). Isso é esperado: o filtro "
                 f"de mediana requer ordenação dos 9 vizinhos para cada pixel, "
                 f"operação que envolve mais sincronização de dados e overhead de "
                 f"comunicação relativo, reduzindo o ganho com paralelização."
@@ -391,8 +289,8 @@ média devido à etapa de ordenação.
 
 3.1 Imagem Utilizada
 ---------------------
-Origem : {img_source}
-Dimensões: {H} x {W} pixels (altura x largura), escala de cinza.
+Origem : {origem_imagem}
+Dimensões: {altura} x {largura} pixels (altura x largura), escala de cinza.
 
 Uma imagem grande foi usada para justificar a paralelização – imagens pequenas
 têm overhead de comunicação MPI maior do que o ganho de processamento.
@@ -444,11 +342,11 @@ todos os processos. Após o processamento, outro comm.Barrier() garante que
 todos terminaram antes de registrar o tempo. Isso assegura que o tempo medido
 reflita o tempo real de execução paralela.
 
-3.8 Remoção de Outliers por IQR
+3.8 Remoção de Outliers por AIQ
 ---------------------------------
-Após coletar os 30 tempos, outliers são removidos pelo método IQR:
-  Q1 = percentil 25, Q3 = percentil 75, IQR = Q3 – Q1
-  Mantém: [Q1 – 1.5·IQR, Q3 + 1.5·IQR]
+Após coletar os 30 tempos, outliers são removidos pelo método AIQ:
+  Q1 = percentil 25, Q3 = percentil 75, AIQ = Q3 – Q1
+  Mantém: [Q1 – 1.5·AIQ, Q3 + 1.5·AIQ]
 Os tempos restantes são usados para calcular média, variância e desvio padrão.
 
 ================================================================================
@@ -472,7 +370,7 @@ Os gráficos foram gerados na pasta output/:
 
 6.1 O filtro de mediana paralelo teve speedup maior ou menor que o de média?
 ------------------------------------------------------------------------------
-{comp_speedup_txt}
+{texto_comparacao_speedup}
 
 Em termos teóricos: o filtro de mediana tem custo computacional maior por pixel
 (requer ordenação de 9 elementos) e, portanto, é mais beneficiado pela
@@ -503,7 +401,7 @@ evitando acessos fora dos limites do array.
 Em mpi4py, existem dois estilos de comunicação coletiva:
 
   • Minúsculo (comm.bcast): usa pickle para serializar qualquer objeto Python.
-    Para um array numpy de {H}×{W} pixels ({H*W} bytes ≈ {H*W/1e6:.1f} MB),
+    Para um array numpy de {altura}×{largura} pixels ({altura*largura} bytes ≈ {altura*largura/1e6:.1f} MB),
     a serialização e desserialização adicionam overhead significativo (pode ser
     2–5× mais lento que a versão com buffer).
 
@@ -525,11 +423,11 @@ processos usando a seguinte lógica:
 
     Processo i recebe: base + (1 se i < resto, senão 0) linhas.
 
-Exemplo: imagem de {H} linhas com 3 processos:
-    base = {H}//3 = {H//3}, resto = {H}%3 = {H%3}
-    Processo 0: {H//3 + (1 if 0 < H%3 else 0)} linhas
-    Processo 1: {H//3 + (1 if 1 < H%3 else 0)} linhas
-    Processo 2: {H//3 + (1 if 2 < H%3 else 0)} linhas
+Exemplo: imagem de {altura} linhas com 3 processos:
+    base = {altura}//3 = {altura//3}, resto = {altura}%3 = {altura%3}
+    Processo 0: {altura//3 + (1 if 0 < altura%3 else 0)} linhas
+    Processo 1: {altura//3 + (1 if 1 < altura%3 else 0)} linhas
+    Processo 2: {altura//3 + (1 if 2 < altura%3 else 0)} linhas
 
 Isso garante que todos os processos recebam uma quantidade válida de linhas
 e que a soma das fatias seja exatamente igual à altura total da imagem.
@@ -563,8 +461,8 @@ FIM DO RELATÓRIO
 ================================================================================
 """.strip()
 
-    with open(path, "w", encoding="utf-8") as f:
+    with open(caminho_arquivo, "w", encoding="utf-8") as f:
         f.write(relatorio)
 
-    print(f"[benchmark] Relatório salvo em: {path}")
-    return path
+    print(f"[benchmark] Relatório salvo em: {caminho_arquivo}")
+    return caminho_arquivo
