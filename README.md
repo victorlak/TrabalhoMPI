@@ -126,6 +126,15 @@ Exemplo: Se a imagem tem 10 linhas e são 3 processos (10/3 dá resto 1). O Proc
 
 ---
 
+## 💻 Máquina do dev-igor
+
+- **OS:** Microsoft Windows 11 Pro 64 bits
+- **CPU:** 13th Gen Intel(R) Core(TM) i7-13620H (10 Núcleos Físicos / 16 Threads)
+- **RAM:** 16 GB
+- **Armazenamento:** SSD 512 GB (HFS512GEJ9X110N)
+
+---
+
 ## 🛠️ Solução de Problemas (Troubleshooting)
 
 | Erro / Comportamento | Solução |
