@@ -2,7 +2,7 @@
          RELATÓRIO – COMPARAÇÃO DE FILTROS DE SUAVIZAÇÃO DE IMAGEM COM MPI
 ================================================================================
 
-Gerado automaticamente pelo programa em 2026-06-04 20:15:42
+Gerado automaticamente pelo programa em 2026-06-05 17:32:15
 
 ================================================================================
 1. INTRODUÇÃO
@@ -116,15 +116,15 @@ Os tempos restantes são usados para calcular média, variância e desvio padrã
 
 Filtro      Processos    Tempo Médio (s)   Variância (s²)  Desvio Padrão (s)    Speedup
 ------------------------------------------------------------------------------------------
-Média      Sequencial           0.200292       0.00018931           0.013759     1.0000
-Média      2 processos           0.082496       0.00000218           0.001476     2.4279
-Média      4 processos           0.071979       0.00011988           0.010949     2.7826
-Média      8 processos           0.082389       0.00001315           0.003626     2.4311
+Média      Sequencial           0.430809       0.00157054           0.039630     1.0000
+Média      2 processos           0.138884       0.00027746           0.016657     3.1019
+Média      4 processos           0.116378       0.00003447           0.005871     3.7018
+Média      8 processos           0.118169       0.00031134           0.017645     3.6457
 
-Mediana    Sequencial           1.765209       0.05899419           0.242887     1.0000
-Mediana    2 processos           0.649979       0.00000225           0.001499     2.7158
-Mediana    4 processos           0.356839       0.00000187           0.001366     4.9468
-Mediana    8 processos           0.398031       0.00083743           0.028938     4.4348
+Mediana    Sequencial           2.028156       0.10654832           0.326417     1.0000
+Mediana    2 processos           1.079889       0.02631174           0.162209     1.8781
+Mediana    4 processos           0.655637       0.00030466           0.017455     3.0934
+Mediana    8 processos           0.501951       0.00338289           0.058163     4.0405
 
 
 ================================================================================
@@ -142,7 +142,7 @@ Os gráficos foram gerados na pasta output/:
 
 6.1 O filtro de mediana paralelo teve speedup maior ou menor que o de média?
 ------------------------------------------------------------------------------
-O filtro de mediana obteve speedup médio (4.032) MAIOR que o de média (2.547). Isso pode parecer contraintuitivo, pois a mediana envolve ordenação e é computacionalmente mais pesada, mas significa que o ganho relativo com paralelização foi maior – possivelmente porque o overhead do trabalho extra se beneficia mais da distribuição entre processos.
+O filtro de média obteve speedup médio (3.483) MAIOR que o de mediana (3.004). Isso é esperado: o filtro de mediana requer ordenação dos 9 vizinhos para cada pixel, operação que envolve mais sincronização de dados e overhead de comunicação relativo, reduzindo o ganho com paralelização.
 
 Em termos teóricos: o filtro de mediana tem custo computacional maior por pixel
 (requer ordenação de 9 elementos) e, portanto, é mais beneficiado pela
