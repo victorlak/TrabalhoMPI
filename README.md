@@ -126,12 +126,41 @@ Exemplo: Se a imagem tem 10 linhas e são 3 processos (10/3 dá resto 1). O Proc
 
 ---
 
-## 💻 Máquina do dev-igor
+## 💻 Máquina do dev-kfrural
 
-- **OS:** Microsoft Windows 11 Pro 64 bits
-- **CPU:** 13th Gen Intel(R) Core(TM) i7-13620H (10 Núcleos Físicos / 16 Threads)
-- **RAM:** 16 GB
-- **Armazenamento:** SSD 512 GB (HFS512GEJ9X110N)
+- **OS:** Ubuntu 22.04.5 LTS (Linux)
+- **CPU:** 13th Gen Intel(R) Core(TM) i7-13650HX (14 Núcleos Físicos, 20 Threads)
+- **RAM:** 31 GB
+- **Cache:** L1d 544 KiB, L2 11,5 MiB, L3 24 MiB
+
+---
+
+## 📊 Resultados de Execução (dev-kfrural)
+
+### Tabela de Tempos e Speedup
+
+| Filtro | Processos | Tempo Médio (s) | Desvio Padrão (s) | Speedup |
+|--------|-----------|-----------------|-------------------|---------|
+| Média | Sequencial (1) | 0,2476 | 0,0069 | 1,0000 |
+| Média | 2 | 0,0848 | 0,0039 | 2,9194 |
+| Média | 4 | 0,0588 | 0,0019 | 4,2076 |
+| Média | 8 | 0,0396 | 0,0019 | 6,2578 |
+| Mediana | Sequencial (1) | 1,7219 | 0,0213 | 1,0000 |
+| Mediana | 2 | 0,6573 | 0,0827 | 2,6199 |
+| Mediana | 4 | 0,3869 | 0,0368 | 4,4506 |
+| Mediana | 8 | 0,2202 | 0,0086 | 7,8200 |
+
+### Gráficos
+
+![Tempo vs Processos](output/tempo_vs_processos.png)
+![Speedup vs Processos](output/speedup_vs_processos.png)
+
+### Análise dos Resultados
+
+- O **filtro de mediana** apresentou speedup superior ao de média (7,82× vs 6,26× com 8 processos), pois seu maior custo computacional por pixel (ordenação) se beneficia mais da paralelização.
+- O **speedup superlinear** observado no filtro de média com 2 processos (2,92×) deve-se provavelmente a efeitos de cache (a fatia de cada processo cabe melhor no cache L2/L3).
+- Com **8 processos**, o speedup do filtro de mediana (7,82×) se aproxima do ideal (8×), indicando boa escalabilidade.
+- O filtro de média satura mais cedo (6,26× com 8 processos) devido ao menor custo computacional por pixel, tornando o overhead de comunicação relativamente mais significativo.
 
 ---
 
