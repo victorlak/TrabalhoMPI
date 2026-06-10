@@ -50,7 +50,7 @@ from benchmark import (
 # ---------------------------------------------------------------------------
 N_REPETICOES = 30       # repetições por filtro por configuração
 OUTPUT_DIR   = "output" # pasta de saída
-IMG_PATH     = "entrada.jpg"
+IMG_PATH     = "entrada_checkerboard.jpg"
 IMG_SINTETICA_SIZE = (4000, 4000)  # altura x largura da imagem sintética
 
 # ---------------------------------------------------------------------------
